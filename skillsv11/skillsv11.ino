@@ -5,7 +5,8 @@
 #include <Servo.h>
 Pixy pixy;
 Block blocks[10];
-
+int slowR = 92.33;
+int slowL = 88.3;
 int forwardR = 88.33; //forward
 int forwardL = 92.3;  //forward
 int reverseR = 100; //reverse
@@ -15,8 +16,8 @@ int stopR = 95;   //moves slightly backward
 int midPos;
 int state = 1; // runs through different states for each part of the field  (set to 1 to enable)
 float mid = 0, sum = 0;
-int high = 21;
-int low = 17;
+int high = 11; // 35 is mid
+int low = 9;
 boolean oneBlock;
 
 int sensorL = A2; // The line sensors are connected to A0, A1 and A2
@@ -33,7 +34,6 @@ class Drive {
     int leftServoPin;
     int rightServoPin;
     int armPin;
-
     Servo leftServo;
     Servo rightServo;
     Servo armServo;
@@ -57,10 +57,7 @@ class Drive {
       //Serial.println ("LeftServo");
       Serial.print (leftServo.read());
     }
-    void driveStraight (int speed) {
-      leftServo.write (speed);
-      rightServo.write (speed);
-    }
+
     void setLeft (int speed) {
       leftServo.write (speed);
     }
@@ -71,6 +68,12 @@ class Drive {
       setLeft(90);
       setRight(90);
     }
+
+    void driveStraight () {
+      setRight (88.33);
+      setLeft(92.3);
+    }
+    
     void grab () {
       armServo.write (100);
       //Serial.println(armServo.read());
@@ -81,16 +84,6 @@ class Drive {
       //Serial.println (armServo.read());
       delay(2000);
     }
-    /*
-      void justOneBlock() {
-      if (oneBlock = false) {
-        state = 1;
-      } else {
-        setLeft(forwardL);
-        setRight(forwardR);
-      }
-      }
-    */
 
     void sensorRead () {
       Lval = analogRead (sensorL);
@@ -98,52 +91,52 @@ class Drive {
       Rval = analogRead (sensorR);
     }
 
-    void straight() { // what to do when through defenders (state 2)
-      setRight(forwardR);
-      setLeft(forwardL);
-      //    delay(2000);
-      if (oneBlock = true) {
+    void getThrough() {  // get through defenders (state 1)
+      if (midPos < low)  {// align robot
+        setRight(slowR);
+        setLeft(stopL);
+      } else if (midPos > high) {
+        setRight(stopR);
+        setLeft(slowL);
+      } else if (midPos < high && midPos > low) {
+        driveStraight(); //move forward
+        delay (2000);
+        state = 2;
+        /*       if (midPos < low)  { // align again
+                 setRight(slowR);
+                 setLeft(stopL);
+               } else if (midPos > high) {
+                 setRight(stopR);
+                 setLeft(slowL);
+               } else if (midPos < high && midPos > low) {
+                 driveStraight();
+                 delay (1000); // get through defenders and change state
+                 stopServos();
+                 state = 2; // go to next state
+               }*/
+      }
+    }
+
+
+   void straight() { // what to do when through defenders (state 2)
+      grab();
+      drop();
+      /*
+        if (oneBlock = true) {
         setRight(forwardR);
         setLeft(forwardL);
         delay(2000);
         setRight(stopR);
         setLeft(stopL);
-      } else if (oneBlock = true) {
+        } else if (oneBlock = true) {
         state = 1;
-      }
+        }
+      */
     }
 
-    void getThrough() {  // get through defenders (state 1)
-      if (midPos < low)  {// align robot
-        setRight(forwardR);
-        setLeft(stopL);
-      } else if (midPos > high) {
-        setRight(stopR);
-        setLeft(forwardL);
-      }
-      setLeft(forwardL);
-      setRight(forwardR);
-      delay (1000); //move forward then stop
-      setLeft(stopL);
-      setRight(stopR);
-      delay (1000);
-      if (midPos < low)  { // alighn again
-        setRight(forwardR);
-        setLeft(stopL);
-      } else if (midPos > high) {
-        setRight(stopR);
-        setLeft(forwardL);
-      }
-      setLeft(forwardL); 
-      setRight(forwardR);
-      delay (3000); // get through defenders and change state
-      state = 2; // go to next state
-    }
-
-
-    void lineFollower() { //follow lines
-      setLeft(forwardL);
-      setRight(forwardR);
+    /*
+      void lineFollower() { //follow lines
+driveStraight();
       if ( Lval < colour && Cval > colour &&  Rval < colour)  { //goes straight when sees line in center
         setLeft(forwardL);
         setRight(forwardR);
@@ -156,15 +149,10 @@ class Drive {
         setLeft(forwardL);
         delay(200);
       }
-      /*
-78        else {
-        setRight(stopR);
-        setLeft(stopL);
-        }
-      */
-    }
+      }
+    */
 
-
+    
 };
 
 class Camera {
@@ -195,13 +183,9 @@ class Camera {
       }
       }*/
 
+
+
     float getMidpoint (Block _blocks []) {//Returns the midpoint of the top two blocks in an array
-      if (_blocks [0].x == NULL) {
-        oneBlock = true;
-      } else {
-        oneBlock = false;
-        return 0;
-      }
       float midpoint = (_blocks [0].x + _blocks [1].x) / 2 ;
       return midpoint;
     }
@@ -265,39 +249,23 @@ void setup() {
 }
 
 void loop() {
-  robot.sensorRead();
   sum = 0.0;
- //  robot.lineFollower();
-
-
-  if (state == 1) { //What states do
-    robot.getThrough();
-  } else if (state == 2) {
-  robot.setLeft(stopL);
-  robot.setRight(stopR);
-  //  robot.straight();
-  }
 
   for (int x = 0; x < 100; x++) {
     getSpecialBlocks(1);
     sum = sum + cam.getMidpoint(blocks);
   }
-
-  mid = sum / 500.0;
-  midPos = mid;
+  mid = sum / 300.0;
   delay(10);
-  Serial.println(mid); //print midpoint
+  Serial.println(mid);
+
   //boolean point = poinToBlock(blocks, 10);
 
-  /*
-    if (oneBlock = false) {
-    //    Serial.println("two blocks");
-      state = 1;
-
-    } else if (oneBlock  = true) {
-    //  Serial.println("only one block");
-      robot.setLeft(forwardL);
-      robot.setRight(forwardR);
+    if (state == 1) { //What states do
+    robot.getThrough();
+  } else if (state == 2) {
+    robot.straight();
+  } else {
+    robot.stopServos();
     }
-  */
 }
