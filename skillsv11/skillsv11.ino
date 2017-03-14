@@ -16,7 +16,7 @@ int stopR = 95;   //moves slightly backward
 int midPos;
 int state = 1; // runs through different states for each part of the field  (set to 1 to enable)
 float mid = 0, sum = 0;
-int high = 11; // 35 is mid
+int high = 14; //Mid Range
 int low = 9;
 boolean oneBlock;
 
@@ -70,10 +70,10 @@ class Drive {
     }
 
     void driveStraight () {
-      setRight (88.33);
+      setRight (87.33);
       setLeft(92.3);
     }
-    
+
     void grab () {
       armServo.write (100);
       //Serial.println(armServo.read());
@@ -89,6 +89,24 @@ class Drive {
       Lval = analogRead (sensorL);
       Cval = analogRead (sensorC);
       Rval = analogRead (sensorR);
+    }
+
+        void straight() { // what to do when through defenders (state 2)
+      setLeft(stopL);
+      setRight(stopR);
+      grab();
+      drop();
+      /*
+        if (oneBlock = true) {
+        setRight(forwardR);
+        setLeft(forwardL);
+        delay(2000);
+        setRight(stopR);
+        setLeft(stopL);
+        } else if (oneBlock = true) {
+        state = 1;
+        }
+      */
     }
 
     void getThrough() {  // get through defenders (state 1)
@@ -118,25 +136,11 @@ class Drive {
     }
 
 
-   void straight() { // what to do when through defenders (state 2)
-      grab();
-      drop();
-      /*
-        if (oneBlock = true) {
-        setRight(forwardR);
-        setLeft(forwardL);
-        delay(2000);
-        setRight(stopR);
-        setLeft(stopL);
-        } else if (oneBlock = true) {
-        state = 1;
-        }
-      */
-    }
+
 
     /*
       void lineFollower() { //follow lines
-driveStraight();
+      driveStraight();
       if ( Lval < colour && Cval > colour &&  Rval < colour)  { //goes straight when sees line in center
         setLeft(forwardL);
         setRight(forwardR);
@@ -152,7 +156,7 @@ driveStraight();
       }
     */
 
-    
+
 };
 
 class Camera {
@@ -251,6 +255,14 @@ void setup() {
 void loop() {
   sum = 0.0;
 
+  if (state == 1) { //What states do
+    robot.getThrough();
+  } else if (state == 2) {
+    robot.straight();
+  } else {
+    robot.stopServos();
+  }
+
   for (int x = 0; x < 100; x++) {
     getSpecialBlocks(1);
     sum = sum + cam.getMidpoint(blocks);
@@ -261,11 +273,5 @@ void loop() {
 
   //boolean point = poinToBlock(blocks, 10);
 
-    if (state == 1) { //What states do
-    robot.getThrough();
-  } else if (state == 2) {
-    robot.straight();
-  } else {
-    robot.stopServos();
-    }
+
 }
