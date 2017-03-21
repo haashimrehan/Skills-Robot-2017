@@ -41,7 +41,7 @@ int Cval;
 int Rval;
 
 //State Controller
-int state = 4; // runs through different states for each part of the field  (set to 1 to enable)
+int state = 5; // runs through different states for each part of the field  (set to 1 to enable)
 
 
 class Drive {
@@ -87,14 +87,19 @@ class Drive {
       setRight(95.999); //95.999
     }
 
-    void driveStraight () {//forward Value
+    void driveStraight () {//forward Value; Turns Very Slightly Right
       setRight (87.33);
-      setLeft(93); //92.3
+      setLeft(94); //92.3
     }
     void driveSlow () { //Slow Forward Value
       setLeft(88.99999);
       setRight(92.3);
     }
+
+    void driveFast() {
+      setLeft(95);
+      setRight(85);
+      }
 
     void reverse() {
       setRight(100); //reverse
@@ -300,7 +305,7 @@ void setup() {
 }
 
 void loop() {
-
+//  robot.driveFast();
   sum = 0.0;// Camera Midpoint
 
   robot.sensorRead(); //Line Sensors
@@ -312,7 +317,7 @@ void loop() {
   pinMode(echoPin, INPUT);
   duration = pulseIn(echoPin, HIGH);
   // convert the time into a distance
-  cm = microsecondsToCentimeters(duration);
+  //  cm = microsecondsToCentimeters(duration);
   dist = duration / 50; //gets average
 
   //dist * time = exactDist
@@ -333,43 +338,65 @@ void loop() {
 
 
   //What States Do
-  if (state == 21) { // Get Through Defenders
-    robot.getThrough();
-    if (pixy.blocks[0].width > 70 && pixy.blocks[1].width > 70) {
+  if (state == 1) { // Get to first wall
+    robot.grab();
+    robot.stopServos();
+    delay(500);
+    robot.driveFast();
+    delay(1800);
+    robot.turnLeft();
+    delay(2000); //turns to much at 2300
+    robot.stopServos();
+    delay(500);
+    robot.driveFast();
+    delay(1000);
+    state = 2;
+
+
+  } else if (state == 2) {
+    if (dist < 17) {//16 - 17
+      robot.turnRight();
+      delay(1800);
+      robot.stopServos();
+      delay(1000);
+      robot.driveFast();
+      delay(13000);
+      robot.stopServos();
+      delay(500);
+      state = 3;
+    } else if (dist > 17) {
       robot.driveStraight();
-      delay(5000);
-      state = 2;
     }
-    robot.getThrough();
 
-  } else if (state == 22) {
-    robot.straight();
-
-  } else if (state == 3) { // Pickup Football
+  } else if (state == 3) {
+    if (dist > 44) {//43-44
+      robot.driveStraight();
+    } else if (dist < 44) {
+      robot.stopServos();
+      state = 8;
+    }
+  } else if (state == 4) { // Pickup Football
     robot.drop();
     // delay(0);
-label:
+
     robot.driveSlow();
     if (Cval > colour || Lval > colour || Rval > colour) {
       robot.driveSlow();
       delay(1500);
-label1:
+
       if (dist > 14) {
         robot.turnLeft();
       } else if (dist < 14) {
         robot.stopServos();
         state = 4;
       }
-      //     goto label1;
     } else {
-      //   goto label;
       ///robot.driveSlow();
     }
-    // goto label1;
-  } else if (state == 4) {//all
+  } else if (state == 5) {//Pickups footballs and reverses (uses Sonar)
     robot.stopServos();
     robot.drop();
-    if (dist > 6 ) {
+    if (dist > 7 ) {
       robot.driveStraight();
       delay(exactDist);
     } else if (dist < 8 ) {
@@ -387,8 +414,8 @@ label1:
       robot.driveStraight();
       state = 5;
     }
-  } else if (state == 5) {
-   
+  } else if (state == 6) {
+
     robot.stopServos();
   }
 
