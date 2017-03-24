@@ -28,7 +28,7 @@ int low = 109; // Mid Range
 const int trigPin = 2; //pins
 const int echoPin = 7;
 long dist = 0L;
-int timing = 20;
+int timing = 15; //20
 int exactDist;
 
 //Line Sensor
@@ -41,7 +41,7 @@ int Cval;
 int Rval;
 
 //State Controller
-int state = 5; // runs through different states for each part of the field  (set to 1 to enable)
+int state = 12; // runs through different states for each part of the field  (set to 1 to enable)
 
 
 class Drive {
@@ -84,11 +84,10 @@ class Drive {
 
     void stopServos() {  //Full Stop
       setLeft(84.99999618811); //84.99999618811
-      setRight(95.999); //95.999
     }
 
     void driveStraight () {//forward Value; Turns Very Slightly Right
-      setRight (87.33);
+      setRight (86.33);
       setLeft(94); //92.3
     }
     void driveSlow () { //Slow Forward Value
@@ -97,13 +96,13 @@ class Drive {
     }
 
     void driveFast() {
-      setLeft(95);
+      setLeft(95.7);
       setRight(85);
-      }
+    }
 
     void reverse() {
       setRight(100); //reverse
-      setLeft(79);
+      setLeft(80);
     }
 
     void turnLeft () { //Turn Left
@@ -114,6 +113,14 @@ class Drive {
     void turnRight() { //Turn Right
       setRight (98);// turn right.    old value = 97
       setLeft (87.99999618811);     //old value =86
+    }
+    
+    void turnRight90() {
+      stopServos();
+      setRight (98);// turn right.    old value = 97
+      setLeft (87.99999618811);     //old value =86
+      delay(2000);
+      stopServos();
     }
 
     //Arm Servo
@@ -305,9 +312,14 @@ void setup() {
 }
 
 void loop() {
-//  robot.driveFast();
+  delay(1000);
+  //robot.stopServos();
+  //robot.driveFast();
+ // robot.turnRight90();
+  delay(100000);
+  
   sum = 0.0;// Camera Midpoint
-
+  //robot.stopServos();
   robot.sensorRead(); //Line Sensors
 
   //Ultrasonic Sensor
@@ -338,10 +350,11 @@ void loop() {
 
 
   //What States Do
-  if (state == 1) { // Get to first wall
+  if (state == 1) {// Get to first wall
+    robot.stopServos();
     robot.grab();
     robot.stopServos();
-    delay(500);
+    delay(50);
     robot.driveFast();
     delay(1800);
     robot.turnLeft();
@@ -352,9 +365,12 @@ void loop() {
     delay(1000);
     state = 2;
 
-
   } else if (state == 2) {
-    if (dist < 17) {//16 - 17
+    robot.driveFast();
+    if (dist > 17) {//16 - 17
+      robot.driveFast();
+      state = 2;
+    } else if (dist < 17) {
       robot.turnRight();
       delay(1800);
       robot.stopServos();
@@ -364,10 +380,7 @@ void loop() {
       robot.stopServos();
       delay(500);
       state = 3;
-    } else if (dist > 17) {
-      robot.driveStraight();
     }
-
   } else if (state == 3) {
     if (dist > 44) {//43-44
       robot.driveStraight();
@@ -394,10 +407,17 @@ void loop() {
       ///robot.driveSlow();
     }
   } else if (state == 5) {//Pickups footballs and reverses (uses Sonar)
+    if (Cval > colour) {
+      robot.stopServos();
+      state = 6;
+    } else if (Cval < colour) {
+      robot.stopServos();
+    }
+  } else if (state == 6) {
     robot.stopServos();
     robot.drop();
     if (dist > 7 ) {
-      robot.driveStraight();
+      robot.driveFast(); //straight
       delay(exactDist);
     } else if (dist < 8 ) {
       robot.stopServos();
@@ -407,17 +427,39 @@ void loop() {
       delay(2000);
       robot.stopServos();
       delay(500);
-      robot.turnRight();
-      delay(2900);
+      robot.turnRight90();
+    //  delay(3500);
       robot.stopServos();
       delay(500);
-      robot.driveStraight();
-      state = 5;
+      robot.driveFast();
+      delay(5000);
+      state = 7;
     }
-  } else if (state == 6) {
-
-    robot.stopServos();
-  }
+  } else if (state == 7) { // checks if Nar wall then turns
+    if (dist > 17) {//16 - 17
+      robot.driveFast();
+      //  state = 6;
+    } else if (dist < 17) {
+      robot.turnRight90();
+     // delay(2500);
+      robot.stopServos();
+      delay(1000);
+      robot.driveFast();
+      delay(18000);
+      robot.driveStraight();
+      state = 8;
+    } 
+  } else if (state = 8) { //drops ball in endzone
+    if (Cval < colour) {
+      robot.stopServos();
+      delay(100);
+      robot.drop();
+      state = 9;
+    } else if (Cval > colour) {
+      robot.driveFast();  
+      }
+    }
+    
 
 
 }
