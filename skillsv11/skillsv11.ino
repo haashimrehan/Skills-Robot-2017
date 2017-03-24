@@ -3,33 +3,49 @@
 #include <PixySPI_SS.h>
 #include <TPixy.h>
 #include <Servo.h>
-Pixy pixy;
-Block blocks[10];
-int slowR = 92.33;
+
+
+//Driving
+int slowR = 92.33; // Slow Forward Values
 int slowL = 88.3;
 int forwardR = 88.33; //forward
-int forwardL = 92.3;  //forward
+int forwardL = 91.9;  //forward
 int reverseR = 100; //reverse
 int reverseL = 79; //reverse
-int stopL = 85;   //stop
-int stopR = 95;   //moves slightly backward
-int midPos;
-int state = 1; // runs through different states for each part of the field  (set to 1 to enable)
-float mid = 0, sum = 0;
-int high = 11; // 35 is mid
-int low = 9;
-boolean oneBlock;
+int stopL = 84.99999618811;   //stop
+int stopR = 96;   //stop
 
+//Camera
+Pixy pixy;
+Block blocks[10];
+int midPos;
+boolean oneBlock;
+float mid = 0, sum = 0;
+int high = 117 ; //Mid Range
+int low = 109; // Mid Range
+
+//Ultrasonic Sensor
+const int trigPin = 2; //pins
+const int echoPin = 7;
+long dist = 0L;
+int timing = 20;
+int exactDist;
+
+//Line Sensor
 int sensorL = A2; // The line sensors are connected to A0, A1 and A2
 int sensorC = A1;
 int sensorR = A0;
 int colour = 800; //middle of black and white
-
 int Lval;
 int Cval;
 int Rval;
 
+//State Controller
+int state = 5; // runs through different states for each part of the field  (set to 1 to enable)
+
+
 class Drive {
+
     //  /http://arduino.stackexchange.com/questions/1321/servo-wont-stop-rotating
     int leftServoPin;
     int rightServoPin;
@@ -40,9 +56,9 @@ class Drive {
 
   public:
     Drive (int leftServo, int rightServo, int armServo) {
-      leftServoPin = leftServo;
-      rightServoPin = rightServo;
-      armPin = armServo;
+      leftServoPin = 9;//leftServo;
+      rightServoPin = 5; //rightServo;
+      armPin = 10;//armServo;
     }
 
     void attachServos() {
@@ -51,108 +67,149 @@ class Drive {
       rightServo.attach(rightServoPin);
       armServo.attach (armPin);
       //Put Servos back in the middle
-      leftServo.write (86.3);
-      rightServo.write (96);
+      leftServo.write (86.3);//86.3
+      rightServo.write (96);//96
       armServo.write (90);
       //Serial.println ("LeftServo");
       Serial.print (leftServo.read());
     }
 
+    //Driving
     void setLeft (int speed) {
       leftServo.write (speed);
     }
     void setRight (int speed) {
       rightServo.write (speed);
     }
-    void stopServos() {
-      setLeft(90);
-      setRight(90);
+
+    void stopServos() {  //Full Stop
+      setLeft(84.99999618811); //84.99999618811
+      setRight(95.999); //95.999
     }
 
-    void driveStraight () {
-      setRight (88.33);
-      setLeft(92.3);
+    void driveStraight () {//forward Value; Turns Very Slightly Right
+      setRight (87.33);
+      setLeft(94); //92.3
     }
-    
-    void grab () {
-      armServo.write (100);
-      //Serial.println(armServo.read());
+    void driveSlow () { //Slow Forward Value
+      setLeft(88.99999);
+      setRight(92.3);
+    }
+
+    void driveFast() {
+      setLeft(95);
+      setRight(85);
+      }
+
+    void reverse() {
+      setRight(100); //reverse
+      setLeft(79);
+    }
+
+    void turnLeft () { //Turn Left
+      setRight (92);//93
+      setLeft (81.99999618811);//turn left 82
+    }
+
+    void turnRight() { //Turn Right
+      setRight (98);// turn right.    old value = 97
+      setLeft (87.99999618811);     //old value =86
+    }
+
+    //Arm Servo
+    void drop () { //Opens Claw
+      armServo.write (130);
+      // Serial.println(armServo.read());
       delay(2000);
     }
-    void drop () {
+    void grab () {//Closes Claw
       armServo.write (10);
       //Serial.println (armServo.read());
       delay(2000);
     }
 
-    void sensorRead () {
+    //Line Follower
+    void sensorRead () { //needs to be enabled for Line Follower
       Lval = analogRead (sensorL);
       Cval = analogRead (sensorC);
       Rval = analogRead (sensorR);
     }
 
-    void getThrough() {  // get through defenders (state 1)
-      if (midPos < low)  {// align robot
-        setRight(slowR);
-        setLeft(stopL);
-      } else if (midPos > high) {
-        setRight(stopR);
-        setLeft(slowL);
-      } else if (midPos < high && midPos > low) {
-        driveStraight(); //move forward
-        delay (2000);
-        state = 2;
-        /*       if (midPos < low)  { // align again
-                 setRight(slowR);
-                 setLeft(stopL);
-               } else if (midPos > high) {
-                 setRight(stopR);
-                 setLeft(slowL);
-               } else if (midPos < high && midPos > low) {
-                 driveStraight();
-                 delay (1000); // get through defenders and change state
-                 stopServos();
-                 state = 2; // go to next state
-               }*/
-      }
-    }
+    void lineFollower() { //follow lines, needs sensorRead(); to be enabled
+      //    if ( Lval > colour && Cval > colour &&  Rval > colour) { // if detects all black
 
-
-   void straight() { // what to do when through defenders (state 2)
-      grab();
-      drop();
-      /*
-        if (oneBlock = true) {
-        setRight(forwardR);
-        setLeft(forwardL);
-        delay(2000);
-        setRight(stopR);
-        setLeft(stopL);
-        } else if (oneBlock = true) {
-        state = 1;
-        }
-      */
-    }
-
-    /*
-      void lineFollower() { //follow lines
-driveStraight();
       if ( Lval < colour && Cval > colour &&  Rval < colour)  { //goes straight when sees line in center
-        setLeft(forwardL);
-        setRight(forwardR);
+        setLeft(slowL);
+        setRight(slowR);
+        if ( Lval < colour && Cval < colour &&  Rval < colour) { // if detects White
+          stopServos();
+          grab();
+        }
       } else if ( Lval > colour && Cval < colour &&  Rval < colour) { //turns right when line is to the left
         setRight(forwardR);
         setLeft(reverseL);
         delay(200);
       } else if ( Lval < colour && Cval < colour && Rval > colour) { //turns left when the line is to far to the right
-        setRight(reverseR);
         setLeft(forwardL);
+        setRight(reverseR);
         delay(200);
       }
-      }
-    */
+    }
 
-    
+    //States
+    void straight() { // what to do when through defenders (state 2)
+      stopServos(); //testing right now
+      grab();
+      drop();
+    }
+
+    void getThrough() {  // get through defenders (state 1)
+      if (blocks) { // if camera sees blocks
+        driveStraight(); //drive straight
+        delay (2800);
+        stopServos();
+        if (mid != 53 || mid != 52 || mid != 54) {
+
+        } else if (mid > 52 && mid < 54)
+          driveStraight();
+      } else {
+        stopServos();
+      }
+      /* if (mid < low) {
+         setLeft(forwardL); //left
+         setRight(slowR);
+         delay(10);
+        } else if (mid > high) { //turn right
+         setRight(forwardR);
+         setLeft(slowL);
+         delay(10);
+        } else if (mid > low && mid < high) { // forward
+         driveStraight();
+         delay(2000);
+        }
+        if (mid < low) {
+         setLeft(forwardL);
+         setRight(slowR);
+         } else if (mid > high) {
+         setRight(forwardR);
+         setLeft(slowL);
+         } else if (mid > low && mid < high) {
+         driveStraight();
+         delay(4000);
+         state = 2;
+         }*/
+    }
+
+    //Ultrasonic Sensor
+    void ping() {
+      pinMode(trigPin, OUTPUT);
+      digitalWrite(trigPin, LOW);
+      delayMicroseconds(2);
+      digitalWrite(trigPin, HIGH);
+      delayMicroseconds(10);
+      digitalWrite(trigPin, LOW);
+    }
+
 };
 
 class Camera {
@@ -183,10 +240,8 @@ class Camera {
       }
       }*/
 
-
-
     float getMidpoint (Block _blocks []) {//Returns the midpoint of the top two blocks in an array
-      float midpoint = (_blocks [0].x + _blocks [1].x) / 2 ;
+      float midpoint = (_blocks [0].x + _blocks [1].x) * 2;
       return midpoint;
     }
 
@@ -220,14 +275,15 @@ void getSpecialBlocks (int signiture) {
       numYellow++;
     }
   }
+
   Block swap;
   boolean sorted ;
   while (!sorted) {
-    //Bubble Sorts Blocks By Height
+    //Bubble Sorts Blocks By x val   --Height--
     sorted = true;
     for (int i = 0; i < pixy.getBlocks(); i++) {
       if (!blocks [i + 1].x == NULL) {//Breaks Out if next block is null
-        if (blocks [i].height > blocks [i + 1].height) {
+        if (blocks [i].width > blocks [i + 1].width) { //was height
           //Swaps the index of blocks one is larger then the next one
           swap = blocks [i];
           blocks [i + 1] = blocks [i];
@@ -249,23 +305,129 @@ void setup() {
 }
 
 void loop() {
-  sum = 0.0;
+//  robot.driveFast();
+  sum = 0.0;// Camera Midpoint
 
+  robot.sensorRead(); //Line Sensors
+
+  //Ultrasonic Sensor
+  exactDist = timing * dist;
+  long duration, cm;
+  robot.ping(); //triggers sensor
+  pinMode(echoPin, INPUT);
+  duration = pulseIn(echoPin, HIGH);
+  // convert the time into a distance
+  //  cm = microsecondsToCentimeters(duration);
+  dist = duration / 50; //gets average
+
+  //dist * time = exactDist
+
+  //Camera Midpoint
   for (int x = 0; x < 100; x++) {
     getSpecialBlocks(1);
     sum = sum + cam.getMidpoint(blocks);
   }
-  mid = sum / 300.0;
-  delay(10);
-  Serial.println(mid);
+  mid = sum / 200.0; //120
+  // delay(10);
 
+  Serial.println(dist); //'mid' For Camera; 'dist' For Ping Sensor; 'Cval' For Line Sensor;
+  //midPos = mid;
   //boolean point = poinToBlock(blocks, 10);
 
-    if (state == 1) { //What states do
-    robot.getThrough();
-  } else if (state == 2) {
-    robot.straight();
-  } else {
+  //delay(2600); turns 90Degrees left
+
+
+  //What States Do
+  if (state == 1) { // Get to first wall
+    robot.grab();
     robot.stopServos();
+    delay(500);
+    robot.driveFast();
+    delay(1800);
+    robot.turnLeft();
+    delay(2000); //turns to much at 2300
+    robot.stopServos();
+    delay(500);
+    robot.driveFast();
+    delay(1000);
+    state = 2;
+
+
+  } else if (state == 2) {
+    if (dist < 17) {//16 - 17
+      robot.turnRight();
+      delay(1800);
+      robot.stopServos();
+      delay(1000);
+      robot.driveFast();
+      delay(13000);
+      robot.stopServos();
+      delay(500);
+      state = 3;
+    } else if (dist > 17) {
+      robot.driveStraight();
     }
+
+  } else if (state == 3) {
+    if (dist > 44) {//43-44
+      robot.driveStraight();
+    } else if (dist < 44) {
+      robot.stopServos();
+      state = 8;
+    }
+  } else if (state == 4) { // Pickup Football
+    robot.drop();
+    // delay(0);
+
+    robot.driveSlow();
+    if (Cval > colour || Lval > colour || Rval > colour) {
+      robot.driveSlow();
+      delay(1500);
+
+      if (dist > 14) {
+        robot.turnLeft();
+      } else if (dist < 14) {
+        robot.stopServos();
+        state = 4;
+      }
+    } else {
+      ///robot.driveSlow();
+    }
+  } else if (state == 5) {//Pickups footballs and reverses (uses Sonar)
+    robot.stopServos();
+    robot.drop();
+    if (dist > 7 ) {
+      robot.driveStraight();
+      delay(exactDist);
+    } else if (dist < 8 ) {
+      robot.stopServos();
+      robot.grab();
+      delay(500);
+      robot.reverse();
+      delay(2000);
+      robot.stopServos();
+      delay(500);
+      robot.turnRight();
+      delay(2900);
+      robot.stopServos();
+      delay(500);
+      robot.driveStraight();
+      state = 5;
+    }
+  } else if (state == 6) {
+
+    robot.stopServos();
+  }
+
+
 }
+
+// Distance to Centimeters for Ultrasonic Sensor
+long microsecondsToCentimeters(long microseconds)
+{
+  // The speed of sound is 340 m/s or 29 microseconds per centimeter.
+  // The ping travels out and back, so to find the distance of the
+  // object we take half of the distance travelled.
+  return microseconds / 29 / 2;
+}
+
