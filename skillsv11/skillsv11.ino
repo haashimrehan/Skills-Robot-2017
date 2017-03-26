@@ -4,7 +4,6 @@
 #include <TPixy.h>
 #include <Servo.h>
 
-
 //Driving
 int slowR = 92.33; // Slow Forward Values
 int slowL = 88.3;
@@ -31,6 +30,10 @@ long dist = 0L;
 int timing = 15; //20
 int exactDist;
 
+//side ping
+const int pingPin = 4;
+int sideDist = 0;
+
 //Line Sensor
 int sensorL = A2; // The line sensors are connected to A0, A1 and A2
 int sensorC = A1;
@@ -41,7 +44,7 @@ int Cval;
 int Rval;
 
 //State Controller
-int state = 12; // runs through different states for each part of the field  (set to 1 to enable)
+int state = 1; // runs through different states for each part of the field  (set to 1 to enable)
 
 
 class Drive {
@@ -83,6 +86,7 @@ class Drive {
     }
 
     void stopServos() {  //Full Stop
+      setRight(96);
       setLeft(84.99999618811); //84.99999618811
     }
 
@@ -96,7 +100,7 @@ class Drive {
     }
 
     void driveFast() {
-      setLeft(95.7);
+      setLeft(95.8); //95.8
       setRight(85);
     }
 
@@ -110,17 +114,35 @@ class Drive {
       setLeft (81.99999618811);//turn left 82
     }
 
+    void turnLeft90() {
+      setRight (92);//93
+      setLeft (81.99999618811);
+      delay(1800);
+    }
+
     void turnRight() { //Turn Right
       setRight (98);// turn right.    old value = 97
       setLeft (87.99999618811);     //old value =86
     }
-    
+
     void turnRight90() {
       stopServos();
       setRight (98);// turn right.    old value = 97
       setLeft (87.99999618811);     //old value =86
-      delay(2000);
-      stopServos();
+      delay(2200);
+      //   stopServos();
+    }
+
+    void driveAgainstWall() {
+      if (sideDist >=  8 && sideDist <= 10) {
+        driveFast();
+      } else if (sideDist > 10) {
+        turnLeft();
+        delay(100);
+      }  else if (sideDist < 8 || sideDist == 360) {
+        turnRight();
+        delay(100);
+      }
     }
 
     //Arm Servo
@@ -215,6 +237,15 @@ class Drive {
       digitalWrite(trigPin, HIGH);
       delayMicroseconds(10);
       digitalWrite(trigPin, LOW);
+    }
+
+    void sidePing() {
+      pinMode(pingPin, OUTPUT);
+      digitalWrite(pingPin, LOW);
+      delayMicroseconds(2);
+      digitalWrite(pingPin, HIGH);
+      delayMicroseconds(5);
+      digitalWrite(pingPin, LOW);
     }
 
 };
@@ -312,27 +343,26 @@ void setup() {
 }
 
 void loop() {
-  delay(1000);
-  //robot.stopServos();
-  //robot.driveFast();
- // robot.turnRight90();
-  delay(100000);
-  
-  sum = 0.0;// Camera Midpoint
-  //robot.stopServos();
+
+  long duration, cm, durations;
+  sum = 0.0;  //Camera Midpoint
   robot.sensorRead(); //Line Sensors
+
+  //side sensor
+  robot.sidePing();
+  pinMode(pingPin, INPUT);
+  durations = pulseIn(pingPin, HIGH);
+  sideDist = durations / 50;
+  //cm = microsecondsToCentimeters(durations);
 
   //Ultrasonic Sensor
   exactDist = timing * dist;
-  long duration, cm;
   robot.ping(); //triggers sensor
   pinMode(echoPin, INPUT);
   duration = pulseIn(echoPin, HIGH);
   // convert the time into a distance
-  //  cm = microsecondsToCentimeters(duration);
-  dist = duration / 50; //gets average
-
-  //dist * time = exactDist
+  cm = microsecondsToCentimeters(duration);
+  dist = duration / 75; //gets average
 
   //Camera Midpoint
   for (int x = 0; x < 100; x++) {
@@ -340,13 +370,10 @@ void loop() {
     sum = sum + cam.getMidpoint(blocks);
   }
   mid = sum / 200.0; //120
-  // delay(10);
 
-  Serial.println(dist); //'mid' For Camera; 'dist' For Ping Sensor; 'Cval' For Line Sensor;
+  Serial.println(Cval); //'mid' For Camera; 'dist' and 'sideDist' For Ping Sensor; 'Cval' For Line Sensor;
   //midPos = mid;
   //boolean point = poinToBlock(blocks, 10);
-
-  //delay(2600); turns 90Degrees left
 
 
   //What States Do
@@ -357,8 +384,8 @@ void loop() {
     delay(50);
     robot.driveFast();
     delay(1800);
-    robot.turnLeft();
-    delay(2000); //turns to much at 2300
+    robot.turnLeft90();
+    ///delay(2100); //turns to much at 2300
     robot.stopServos();
     delay(500);
     robot.driveFast();
@@ -367,44 +394,44 @@ void loop() {
 
   } else if (state == 2) {
     robot.driveFast();
+
     if (dist > 17) {//16 - 17
       robot.driveFast();
-      state = 2;
+      //  state = 6;
     } else if (dist < 17) {
-      robot.turnRight();
-      delay(1800);
+      robot.turnRight90();
+      //delay(1700);
       robot.stopServos();
       delay(1000);
-      robot.driveFast();
-      delay(13000);
-      robot.stopServos();
-      delay(500);
+      robot.driveAgainstWall();
       state = 3;
     }
   } else if (state == 3) {
-    if (dist > 44) {//43-44
-      robot.driveStraight();
-    } else if (dist < 44) {
+//    robot.driveAgainstWall();
+    if (dist > 27) {//43-44
+      robot.driveAgainstWall();
+    } else if (dist < 27) {
       robot.stopServos();
-      state = 8;
+      delay(500);
+      robot.turnRight90();
+      robot.stopServos();
+      delay(10);
+      robot.driveFast();
+      state = 4;
     }
   } else if (state == 4) { // Pickup Football
-    robot.drop();
-    // delay(0);
-
-    robot.driveSlow();
     if (Cval > colour || Lval > colour || Rval > colour) {
-      robot.driveSlow();
-      delay(1500);
+    robot.driveFast();
+     // delay(1500);
 
       if (dist > 14) {
         robot.turnLeft();
       } else if (dist < 14) {
         robot.stopServos();
-        state = 4;
+        state = 6;
       }
     } else {
-      ///robot.driveSlow();
+      robot.driveFast();
     }
   } else if (state == 5) {//Pickups footballs and reverses (uses Sonar)
     if (Cval > colour) {
@@ -416,6 +443,7 @@ void loop() {
   } else if (state == 6) {
     robot.stopServos();
     robot.drop();
+
     if (dist > 7 ) {
       robot.driveFast(); //straight
       delay(exactDist);
@@ -426,40 +454,44 @@ void loop() {
       robot.reverse();
       delay(2000);
       robot.stopServos();
-      delay(500);
+      //  delay(500);
       robot.turnRight90();
-    //  delay(3500);
+      //  delay(3500);
       robot.stopServos();
       delay(500);
       robot.driveFast();
       delay(5000);
       state = 7;
     }
-  } else if (state == 7) { // checks if Nar wall then turns
+  } else if (state == 7) { // checks if there is a wall then turns
     if (dist > 17) {//16 - 17
       robot.driveFast();
       //  state = 6;
     } else if (dist < 17) {
       robot.turnRight90();
-     // delay(2500);
+      // delay(2500);
       robot.stopServos();
       delay(1000);
       robot.driveFast();
       delay(18000);
       robot.driveStraight();
       state = 8;
-    } 
-  } else if (state = 8) { //drops ball in endzone
+    }
+  } else if (state == 8) { //drops ball in endzone
     if (Cval < colour) {
       robot.stopServos();
       delay(100);
       robot.drop();
-      state = 9;
+      state = 19;
     } else if (Cval > colour) {
-      robot.driveFast();  
-      }
+      robot.driveFast();
     }
-    
+  } else if (state == 9) {
+    //robot.stopServos();
+    robot.driveAgainstWall();
+
+  }
+
 
 
 }
